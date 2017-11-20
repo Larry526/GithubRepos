@@ -8,8 +8,11 @@
 
 #import "MasterViewController.h"
 #import "DetailViewController.h"
+#import "CustomTableViewCell.h"
 
-@interface MasterViewController ()
+@interface MasterViewController () <UITableViewDataSource>
+
+@property (weak, nonatomic) IBOutlet UILabel *repoName;
 
 @property NSMutableArray *objects;
 @end
@@ -18,11 +21,48 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // Do any additional setup after loading the view, typically from a nib.
-    self.navigationItem.leftBarButtonItem = self.editButtonItem;
 
-    UIBarButtonItem *addButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(insertNewObject:)];
-    self.navigationItem.rightBarButtonItem = addButton;
+    NSURL *url = [NSURL URLWithString:@"https://api.github.com/users/Larry526/repos"]; // 1
+    NSURLRequest *urlRequest = [[NSURLRequest alloc] initWithURL:url]; // 2
+    
+    NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration defaultSessionConfiguration]; // 3
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration]; // 4
+    
+    NSURLSessionDataTask *dataTask = [session dataTaskWithRequest:urlRequest completionHandler:^(NSData *  data, NSURLResponse *  response, NSError *  error) {
+        
+        if (error) { // 1
+            // Handle the error
+            NSLog(@"error: %@", error.localizedDescription);
+            return;
+        }
+        
+        NSError *jsonError = nil;
+        NSArray *repos = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError]; // 2
+        
+        if (jsonError) { // 3
+            // Handle the error
+            NSLog(@"jsonError: %@", jsonError.localizedDescription);
+            return;
+        }
+        
+        // If we reach this point, we have successfully retrieved the JSON from the API
+        self.objects = [@[] mutableCopy];
+        for (NSDictionary *repo in repos) { // 4
+            NSString *repoName = repo[@"name"];
+            [self.objects addObject:repoName];
+            NSLog(@"repo: %@", self.objects);
+        }
+        
+        [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+            // This will run on the main queue
+            
+            [self.tableView reloadData];
+            
+            
+        }];
+    }]; // 5
+
+    [dataTask resume]; // 6
 }
 
 
@@ -36,14 +76,7 @@
 }
 
 
-- (void)insertNewObject:(id)sender {
-    if (!self.objects) {
-        self.objects = [[NSMutableArray alloc] init];
-    }
-    [self.objects insertObject:[NSDate date] atIndex:0];
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:0 inSection:0];
-    [self.tableView insertRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
-}
+
 
 
 #pragma mark - Segues
@@ -71,27 +104,12 @@
 
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
+     CustomTableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
 
-    NSDate *object = self.objects[indexPath.row];
-    cell.textLabel.text = [object description];
+    NSString *object = self.objects[indexPath.row];
+    cell.repoNameLabel.text = object;
+    
     return cell;
-}
-
-
-- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
-    // Return NO if you do not want the specified item to be editable.
-    return YES;
-}
-
-
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (editingStyle == UITableViewCellEditingStyleDelete) {
-        [self.objects removeObjectAtIndex:indexPath.row];
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-    } else if (editingStyle == UITableViewCellEditingStyleInsert) {
-        // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view.
-    }
 }
 
 
